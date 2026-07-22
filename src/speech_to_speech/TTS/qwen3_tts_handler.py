@@ -614,13 +614,16 @@ class Qwen3TTSHandler(BaseHandler[TTSIn, TTSOut]):
 
             # Trim the initial silent ramp-up, but keep enough preroll to avoid
             # shaving soft initial phonemes at the start of the utterance.
+            # REACHIQ_TTS_ONSET_PREROLL_V1: softer threshold + longer preroll + lead-in pad for Hello/ello.
             if not found_speech:
-                threshold = int(32768 * 0.01)
+                threshold = int(32768 * 0.003)
                 above = np.abs(audio_chunk) > threshold
                 if not np.any(above):
                     continue
-                start_idx = max(0, int(np.argmax(above)) - int(PIPELINE_SR * 0.040))
+                start_idx = max(0, int(np.argmax(above)) - int(PIPELINE_SR * 0.160))
                 audio_chunk = audio_chunk[start_idx:]
+                lead = np.zeros(int(PIPELINE_SR * 0.060), dtype=np.int16)
+                audio_chunk = np.concatenate([lead, audio_chunk])
                 found_speech = True
 
             audio_chunk = np.concatenate([leftover, audio_chunk])
