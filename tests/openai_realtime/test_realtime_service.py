@@ -1249,6 +1249,53 @@ class TestDispatchPipelineEvent:
         assert evt.usage.type == "duration"
         assert service._state(conn_id).response_pending is True
 
+    def test_transcription_waits_for_manual_response_when_auto_response_disabled(
+        self,
+        service,
+        conn_id,
+        text_prompt_queue,
+    ):
+        service.handle_session_update(
+            conn_id,
+            SessionUpdateEvent(
+                type="session.update",
+                session={
+                    "type": "realtime",
+                    "audio": {
+                        "input": {
+                            "turn_detection": {
+                                "type": "server_vad",
+                                "create_response": False,
+                            }
+                        }
+                    },
+                },
+            ),
+        )
+
+        events = service.dispatch_pipeline_event(
+            conn_id,
+            TranscriptionCompletedEvent(transcript="yes, this is Elysio"),
+        )
+
+        assert len(events) == 1
+        assert isinstance(events[0], ConversationItemInputAudioTranscriptionCompletedEvent)
+        assert text_prompt_queue.empty()
+        assert service._state(conn_id).response_pending is False
+
+        result = service.handle_response_create(
+            conn_id,
+            ResponseCreateEvent(
+                type="response.create",
+                response={"instructions": "Ask the ownership question exactly once."},
+            ),
+        )
+        assert isinstance(result, ResponseCreatedEvent)
+        request = text_prompt_queue.get_nowait()
+        assert isinstance(request, GenerateResponseRequest)
+        assert request.response.instructions == "Ask the ownership question exactly once."
+        assert text_prompt_queue.empty()
+
     def test_empty_transcription_completed_emits_event_without_response(
         self,
         service,

@@ -440,7 +440,7 @@ class RealtimeService:
             st.speculative_user_speech_stopped_at_s = event.speech_stopped_at_s
 
         queue = self.text_prompt_queue
-        if queue and transcript:
+        if queue and transcript and cfg.create_response_enabled:
             st.response_pending = True
             queue.put(
                 GenerateResponseRequest(
